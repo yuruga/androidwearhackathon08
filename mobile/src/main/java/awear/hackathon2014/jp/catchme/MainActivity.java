@@ -13,6 +13,8 @@ import android.location.Criteria;
 import android.location.Location;
 import android.location.LocationManager;
 import android.net.Uri;
+import android.net.wifi.WifiInfo;
+import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -27,6 +29,10 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import com.firebase.client.DataSnapshot;
+import com.firebase.client.Firebase;
+import com.firebase.client.FirebaseError;
+import com.firebase.client.ValueEventListener;
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
@@ -51,8 +57,10 @@ import com.google.android.gms.wearable.Wearable;
 import java.io.ByteArrayOutputStream;
 import java.util.Collection;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -105,6 +113,8 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
                 .build();
 
         setUpMapIfNeeded();
+
+        setUpData();
     }
 
     @Override
@@ -154,6 +164,12 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    @Override
+    public void onDestroy(){
+        super.onDestroy();
+        removeSelfData();
     }
 
     private void setUpMapIfNeeded() {
@@ -399,4 +415,115 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
             Log.d(tag, message);
         }
     }
+
+    /**
+     * firebase
+     */
+    private Firebase _usersRef;
+    private String _macAddress;
+    private Map<String, User> _users;
+    private Boolean _isfirst = false;
+    public class User {
+        private double latitude;
+        private double longitude;
+        private double distance;
+        public User() {}
+        public User(double latitude, double longitude) {
+            this.latitude = latitude;
+            this.longitude = longitude;
+        }
+        public double getLatitude() {
+            return latitude;
+        }
+        public double getLongitude() {
+            return longitude;
+        }
+        public void setLatitude(double val) {
+            latitude = val;
+        }
+        public void setLongitude(double val) {
+            longitude = val;
+        }
+        public double getDistance() {
+            return distance;
+        }
+        public void setDistance(double d) {
+            distance = d;
+        }
+    }
+
+    public void setUpData(){
+
+        WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+        WifiInfo wifiInfo = wifiManager.getConnectionInfo();
+
+        _macAddress = wifiInfo.getMacAddress();
+        if(_macAddress == null){
+            _macAddress = "emu";
+        }
+
+        Firebase ref = new Firebase("https://amber-inferno-5746.firebaseio.com/");
+        _usersRef = ref.child("users");
+        _usersRef.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(DataSnapshot dataSnapshot) {
+                _users = (Map<String, User>)dataSnapshot.getValue();
+                if(_users == null){
+                    _users = new HashMap<String, User>();
+                }
+                if(!_isfirst){
+                    _isfirst = true;
+                    updateSelfData();
+                }
+            }
+
+            @Override
+            public void onCancelled(FirebaseError firebaseError) {
+
+            }
+        });
+    }
+
+    public void updateSelfData()
+    {
+        if(_users.containsKey(_macAddress)){
+            _users.remove(_macAddress);
+        }
+        User user = new User(latitude, longitude);
+        _users.put(_macAddress, user);
+        _usersRef.setValue(_users);
+    }
+
+    public Map<String, User> getUsers(){
+        User self = _users.get(_macAddress);
+        User u;
+        for (String key : _users.keySet()) {
+            if(key == _macAddress){
+                u = _users.get(key);
+                u.setDistance(getDistance(self.getLatitude(), self.getLongitude(), u.getLatitude(), u.getLongitude()));
+            }else{
+                self.setDistance(0);
+            }
+        }
+        return _users;
+    }
+
+    public double getDistance(double fLat, double fLon, double tLat, double tLon){
+        double er = 6378.137f;
+        double diffLat = Math.PI / 180 * (tLat - fLat);
+        double diffLon = Math.PI / 180 * (tLon - fLon);
+        double disLat = er * diffLat;
+        double disLon = Math.cos(Math.PI / 180 * fLat) * er * diffLon;
+        double dis = Math.sqrt(Math.pow(disLon, 2) + Math.pow(disLat, 2));
+        return dis * 1000;
+    }
+
+    public void removeSelfData(){
+        if(_users.containsKey(_macAddress)){
+            _users.remove(_macAddress);
+        }
+        _usersRef.setValue(_users);
+    }
+
+
 }
