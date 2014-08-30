@@ -9,10 +9,14 @@ import android.content.Intent;
 import android.content.IntentSender;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.location.Criteria;
+import android.location.Location;
+import android.location.LocationManager;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
+import android.support.v4.app.FragmentActivity;
 import android.support.v4.app.NotificationCompat;
 import android.support.v4.app.NotificationManagerCompat;
 import android.support.v4.app.NotificationCompat.WearableExtender;
@@ -20,23 +24,40 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.ResultCallback;
+import com.google.android.gms.maps.CameraUpdateFactory;
+import com.google.android.gms.maps.GoogleMap;
+import com.google.android.gms.maps.SupportMapFragment;
+import com.google.android.gms.maps.model.LatLng;
+import com.google.android.gms.wearable.Asset;
 import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.MessageApi;
 import com.google.android.gms.wearable.MessageEvent;
 import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.NodeApi;
+import com.google.android.gms.wearable.PutDataMapRequest;
+import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
 
 import java.util.Collection;
+import java.util.Date;
 import java.util.HashSet;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.ScheduledThreadPoolExecutor;
+import java.util.concurrent.TimeUnit;
 
 
-public class MainActivity extends Activity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, MessageApi.MessageListener, NodeApi.NodeListener, DataApi.DataListener{
+public class MainActivity extends FragmentActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, MessageApi.MessageListener, NodeApi.NodeListener, DataApi.DataListener{
+
+    private GoogleMap mMap; // Might be null if Google Play services APK is not available.
+    public double latitude = 0;
+    public double longitude = 0;
 
     //log tag
     private static final String TAG = "MainActivity";
@@ -44,12 +65,12 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
     private static final int REQUEST_RESOLVE_ERROR = 1000;
 
     //action
-    public static final String ACTION_OPEN_WEAR_APP = "awear.hackathon2014.jp.OPEN_WEAR_APP";
+    //public static final String ACTION_OPEN_WEAR_APP = "awear.hackathon2014.jp.OPEN_WEAR_APP";
 
     //data api key and path
     private static final String START_ACTIVITY_PATH = "/start-activity";
-    private static final String POSITION_PATH = "/image";
-    private static final String POSITION_KEY = "photo";
+    private static final String POSITION_PATH = "/position";
+    private static final String POSITION_KEY = "position";
 
     private int notificationId = 0;
 
@@ -58,19 +79,26 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
     private boolean mResolvingError = false;
     private Handler mHandler;
 
+    // Send DataItems.
+    private ScheduledExecutorService mGeneratorExecutor;
+    private ScheduledFuture<?> mDataItemGeneratorFuture;
+    private int mPositionData = 0;
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
         mHandler = new Handler();
-
+        mGeneratorExecutor   = new ScheduledThreadPoolExecutor(1);
 
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addApi(Wearable.API)
                 .addConnectionCallbacks(this)
                 .addOnConnectionFailedListener(this)
                 .build();
+
+        setUpMapIfNeeded();
     }
 
     @Override
@@ -82,21 +110,25 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
     }
 
     @Override
+    public void onResume() {
+        super.onResume();
+        mDataItemGeneratorFuture = mGeneratorExecutor.scheduleWithFixedDelay(
+                new PositionDataSender(), 1, 5, TimeUnit.SECONDS);
+        setUpMapIfNeeded();
+    }
+
+    @Override
+    public void onPause() {
+        super.onPause();
+        mDataItemGeneratorFuture.cancel(true /* mayInterruptIfRunning */);
+    }
+
+
+    @Override
     protected void onNewIntent(Intent intent) {
         LOGD(TAG,"onNewIntent");
         super.onNewIntent(intent);
         String action = intent.getAction();
-        if(action == ACTION_OPEN_WEAR_APP)
-        {
-            NotificationManager manager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-            manager.cancel(notificationId);
-            new StartWearableActivityTask().execute();
-        }
-        /*if(action == ACTION_SEND_NOTIFICATION)
-        {
-            String imageUrl = intent.getExtras().getString("url");
-            new DownloadImageTask().execute(imageUrl);
-        }*/
     }
 
     @Override
@@ -118,63 +150,92 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
         return super.onOptionsItemSelected(item);
     }
 
-    public void onSendNotificationClicked(View view) {
-        LOGD(TAG,"sendNotificationClicked");
-        createNotificationAndSend();
+    private void setUpMapIfNeeded() {
+        // Do a null check to confirm that we have not already instantiated the map.
+        if (mMap == null) {
+            mMap = ((SupportMapFragment) getSupportFragmentManager().findFragmentById(R.id.map))
+                    .getMap();
+            // Check if we were successful in obtaining the map.
+            if (mMap != null) {            // Try to obtain the map from the SupportMapFragment.
+
+                setUpMap();
+            }
+        }
+    }
+    private void setUpMap() {
+//        mMap.addMarker(new MarkerOptions().position(new LatLng(0, 0)).title("Marker"));
+
+        //Google MapのMyLocationレイヤーを使用可能にする
+        mMap.setMyLocationEnabled(true);
+        mMap.setIndoorEnabled(true);
+        mMap.setMapType(GoogleMap.MAP_TYPE_NORMAL);
+        mMap.setTrafficEnabled(true);
+
+        //MapEvents
+        mMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
+            @Override
+            public void onMapClick(LatLng latLng) {
+                Toast.makeText(getApplicationContext(), "タップ位置\n緯度：" + latLng.latitude + "\n経度:" + latLng.longitude, Toast.LENGTH_LONG).show();
+
+            }
+        });
+
+        mMap.setOnMyLocationChangeListener(new GoogleMap.OnMyLocationChangeListener() {
+            @Override
+            public void onMyLocationChange(Location location) {
+                //Toast.makeText(getApplicationContext(), "タップ位置\n緯度：" + location.getLatitude() + "\n経度:" + location.getLongitude(), Toast.LENGTH_LONG).show();
+            }
+        });
+
+        //システムサービスのLOCATION_SERVICEからLocationManager objectを取得
+        LocationManager locationManager = (LocationManager) getSystemService(LOCATION_SERVICE);
+
+        //retrieve providerへcriteria objectを生成
+        Criteria criteria = new Criteria();
+
+        //Best providerの名前を取得
+        String provider = locationManager.getBestProvider(criteria, true);
+
+        //現在位置を取得
+        Location location = locationManager.getLastKnownLocation(provider);
+
+        //現在位置の緯度を取得
+        latitude = location.getLatitude();
+
+        //現在位置の経度を取得
+        longitude = location.getLongitude();
+
+        //現在位置からLatLng objectを生成
+        LatLng latLng = new LatLng(latitude, longitude);
+
+        //Google Mapに現在地を表示
+        mMap.moveCamera(CameraUpdateFactory.newLatLng(latLng));
+
+        //Google Mapの Zoom値を指定
+        mMap.animateCamera(CameraUpdateFactory.zoomTo(20));
     }
 
-    private void createNotificationAndSend(){
-        //main notification
-        NotificationCompat.Builder notifBulder = new NotificationCompat.Builder(this)
-                .setContentTitle(getResources().getString(R.string.notification_title))
-                .setContentText(getResources().getString(R.string.notification_text01))
-                //.setSound(Uri.parse("android.resource://jp.mdnht.drawmessenger/raw/yo"))
-                .setDefaults(Notification.DEFAULT_VIBRATE | Notification.DEFAULT_LIGHTS | Notification.DEFAULT_SOUND)
-                .setSmallIcon(R.drawable.common_signin_btn_icon_dark);
-                //.setLargeIcon(imageBitmap);
+    public void onSendNotificationClicked(View view) {
+        LOGD(TAG,"sendNotificationClicked");
+        //createNotificationAndSend();
+    }
 
-        //extender for page2
-        /*WearableExtender extender2 = new WearableExtender()
-                .setHintShowBackgroundOnly(true)
-                .setBackground(imageBitmap);*/
-        // Create second page notification
-        /*Notification secondPageNotification = new NotificationCompat.Builder(this)
-                .setContentTitle("pege2")
-                .setContentText("test")
-                .extend(extender2)
-                .build();*/
 
-        // Create an intent for the reply action
-        Intent actionIntent = new Intent(this, MainActivity.class);
-        actionIntent.setAction(ACTION_OPEN_WEAR_APP);
-        PendingIntent actionPendingIntent =
-                PendingIntent.getActivity(this, 0, actionIntent,
-                        PendingIntent.FLAG_UPDATE_CURRENT);
-        /*Intent actionIntent = new Intent(this, MessageReceiver.class);
-        actionIntent.setAction("jp.mdnht.drawmessenger.OPEN_WEAR_APP");
-        PendingIntent actionPendingIntent =
-                PendingIntent.getBroadcast(this, 1, actionIntent, PendingIntent.FLAG_UPDATE_CURRENT);*/
 
-        // Create the action
-        NotificationCompat.Action action =
-                new NotificationCompat.Action.Builder(R.drawable.common_signin_btn_icon_disabled_focus_light,"launch wear app", actionPendingIntent)
-                        .build();
+    private void sendPosition(long[] data) {
+        //long[] data = new long[3];
+        PutDataMapRequest dataMapReq = PutDataMapRequest.create(POSITION_PATH);
+        dataMapReq.getDataMap().putLongArray(POSITION_KEY, data);
+        PutDataRequest request = dataMapReq.asPutDataRequest();
+        Wearable.DataApi.putDataItem(mGoogleApiClient, request)
+                .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+                    @Override
+                    public void onResult(DataApi.DataItemResult dataItemResult) {
+                        LOGD(TAG, "Sending data was successful: " + dataItemResult.getStatus()
+                                .isSuccess());
+                    }
+                });
 
-        // Create a WearableExtender to add functionality for wearables
-        Notification notif =
-                new WearableExtender()
-                        //.addPage(secondPageNotification)
-                        .addAction(action)
-                        .extend(notifBulder)
-                        .build();
-
-        // Get an instance of the NotificationManager service
-        NotificationManagerCompat notificationManager =
-                NotificationManagerCompat.from(this);
-
-        // Build the notification and issues it with notification manager.
-        notificationManager.notify(notificationId, notif);
-        //notificationId ++;
     }
 
     private class StartWearableActivityTask extends AsyncTask<Void, Void, Void> {
@@ -280,6 +341,50 @@ public class MainActivity extends Activity implements GoogleApiClient.Connection
         return results;
     }
 
+
+    /** Generates a DataItem based on an incrementing count. */
+    private class PositionDataSender implements Runnable {
+
+        private int count = 0;
+
+
+        @Override
+        public void run() {
+            LOGD(TAG, "send position data"+mPositionData);
+            /*PutDataMapRequest putDataMapRequest = PutDataMapRequest.create(COUNT_PATH);
+            putDataMapRequest.getDataMap().putInt(COUNT_KEY, count++);
+            PutDataRequest request = putDataMapRequest.asPutDataRequest();
+
+            LOGD(TAG, "Generating DataItem: " + request);
+            if (!mGoogleApiClient.isConnected()) {
+                return;
+            }
+            Wearable.DataApi.putDataItem(mGoogleApiClient, request)
+                    .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+                        @Override
+                        public void onResult(DataApi.DataItemResult dataItemResult) {
+                            if (!dataItemResult.getStatus().isSuccess()) {
+                                Log.e(TAG, "ERROR: failed to putDataItem, status code: "
+                                        + dataItemResult.getStatus().getStatusCode());
+                            }
+                        }
+                    });*/
+
+            PutDataMapRequest dataMapReq = PutDataMapRequest.create(POSITION_PATH);
+            dataMapReq.getDataMap().putInt(POSITION_KEY, mPositionData);
+            PutDataRequest request = dataMapReq.asPutDataRequest();
+            Wearable.DataApi.putDataItem(mGoogleApiClient, request)
+                    .setResultCallback(new ResultCallback<DataApi.DataItemResult>() {
+                        @Override
+                        public void onResult(DataApi.DataItemResult dataItemResult) {
+                            LOGD(TAG, "Sending data was successful: " + dataItemResult.getStatus()
+                                    .isSuccess());
+                        }
+                    });
+
+            mPositionData ++;
+        }
+    }
 
     /**
      * As simple wrapper around Log.d
