@@ -16,6 +16,7 @@ import com.google.android.gms.wearable.DataEvent;
 import com.google.android.gms.wearable.DataEventBuffer;
 import com.google.android.gms.wearable.DataMap;
 import com.google.android.gms.wearable.DataMapItem;
+import com.google.android.gms.wearable.Node;
 import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
@@ -32,6 +33,11 @@ public class MyService extends WearableListenerService {
     @Override
     public void onCreate () {
         Log.d(TAG,"onCreate");
+        super.onCreate();
+        mGoogleApiClient = new GoogleApiClient.Builder(this)
+                .addApi(Wearable.API)
+                .build();
+        mGoogleApiClient.connect();
         /*
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(new GoogleApiClient.ConnectionCallbacks() {
@@ -62,6 +68,7 @@ public class MyService extends WearableListenerService {
         Log.d(TAG, "send");
         */
     }
+    @Override
     public void onDataChanged(DataEventBuffer dataEvents) {
         Log.d(TAG, "onDataChanged");
         for (DataEvent event : dataEvents) {
@@ -75,6 +82,22 @@ public class MyService extends WearableListenerService {
                     Log.d(TAG, "distance:" + distance);
                 }
             }
+        }
+    }
+
+    @Override
+    public void onPeerConnected(Node peer) {
+        LOGD(TAG, "onPeerConnected: " + peer);
+    }
+
+    @Override
+    public void onPeerDisconnected(Node peer) {
+        LOGD(TAG, "onPeerDisconnected: " + peer);
+    }
+
+    public static void LOGD(final String tag, String message) {
+        if (Log.isLoggable(tag, Log.DEBUG)) {
+            Log.d(tag, message);
         }
     }
 }
