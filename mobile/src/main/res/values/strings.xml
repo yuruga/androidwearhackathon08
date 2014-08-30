@@ -2,7 +2,8 @@
 <resources>
 
     <string name="app_name">catchme</string>
-    <string name="hello_world">Hello world!</string>
+    <string name="notification_title">YEAH!!</string>
+    <string name="notification_text01">Someone is comming!</string>
     <string name="action_settings">Settings</string>
 
 </resources>
