@@ -75,10 +75,12 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
 
     //data api key and path
     private static final String START_ACTIVITY_PATH = "/start-activity";
+    private static final String CATCH_ACTION_PATH = "/catch";
     private static final String POSITION_PATH = "/position";
     private static final String POSITION_KEY = "position";
 
-    private int notificationId = 0;
+    private static final int NOTIFICATION_CATCHED = 0;
+    private static final int NOTIFICATION_CATCH = 1;
 
     //google api
     private GoogleApiClient mGoogleApiClient;
@@ -226,6 +228,57 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
         //createNotificationAndSend();
     }
 
+    private void sendNotification(int notificationId){
+        String title;
+        String text;
+        switch (notificationId)
+        {
+
+            case NOTIFICATION_CATCH:
+            {
+                title = getResources().getString(R.string.notification_title_win);
+                text = "";
+                break;
+            }
+            case NOTIFICATION_CATCHED:
+            {
+                title = getResources().getString(R.string.notification_title_lose);
+                text = "";
+            }
+        }
+
+        //main notification
+        NotificationCompat.Builder notifBulder = new NotificationCompat.Builder(this)
+                .setContentTitle("You are catched!")
+                .setContentText("")
+                //.setSound(Uri.parse("android.resource://jp.mdnht.drawmessenger/raw/yo"))
+                .setDefaults(Notification.DEFAULT_VIBRATE | Notification.DEFAULT_LIGHTS | Notification.DEFAULT_SOUND)
+                .setSmallIcon(R.drawable.common_signin_btn_icon_dark);
+                //.setLargeIcon(imageBitmap);
+
+
+        /*// Create the action
+        NotificationCompat.Action action =
+                new NotificationCompat.Action.Builder(R.drawable.common_signin_btn_icon_disabled_focus_light,"launch wear app", actionPendingIntent)
+                        .build();*/
+
+        // Create a WearableExtender to add functionality for wearables
+        Notification notif = notifBulder.build();
+               // new WearableExtender()
+                        //.addPage(secondPageNotification)
+                        //.addAction(action)
+                        //.extend(notifBulder)
+                        //.build();
+
+        // Get an instance of the NotificationManager service
+        NotificationManagerCompat notificationManager =
+                NotificationManagerCompat.from(this);
+
+        // Build the notification and issues it with notification manager.
+        notificationManager.notify(notificationId, notif);
+        //notificationId ++;
+    }
+
 
 
     private void sendPosition(long[] data) {
@@ -334,6 +387,11 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
     public void onMessageReceived(MessageEvent messageEvent) {
         LOGD(TAG, "onMessageReceived() A message from watch was received:" + messageEvent
                 .getRequestId() + " " + messageEvent.getPath());
+        String path = messageEvent.getPath();
+        if(CATCH_ACTION_PATH == path)
+        {
+
+        }
     }
 
     private Collection<String> getNodes() {
