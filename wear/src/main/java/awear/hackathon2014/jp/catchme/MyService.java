@@ -1,7 +1,11 @@
 package awear.hackathon2014.jp.catchme;
 
+import android.app.Notification;
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -24,8 +28,9 @@ import com.google.android.gms.wearable.WearableListenerService;
 
 public class MyService extends WearableListenerService {
     private static final String TAG = "MyService";
-    private static final String POSITION_PATH = "/position";
-    private static final String POSITION_KEY = "position";
+    public static final String POSITION_PATH = "/position";
+    public static final String POSITION_KEY = "position";
+    public static final String CATCH_ACTION_PATH = "/catch";
     public MyService() {
     }
 
@@ -34,11 +39,6 @@ public class MyService extends WearableListenerService {
     public void onCreate () {
         Log.d(TAG,"onCreate");
         super.onCreate();
-        mGoogleApiClient = new GoogleApiClient.Builder(this)
-                .addApi(Wearable.API)
-                .build();
-        mGoogleApiClient.connect();
-        /*
         mGoogleApiClient = new GoogleApiClient.Builder(this)
                 .addConnectionCallbacks(new GoogleApiClient.ConnectionCallbacks() {
                     @Override
@@ -51,22 +51,9 @@ public class MyService extends WearableListenerService {
                         Log.d(TAG, "onConnectionSuspended: " + cause);
                     }
                 })
-                .addOnConnectionFailedListener(new GoogleApiClient.OnConnectionFailedListener() {
-                    @Override
-                    public void onConnectionFailed(ConnectionResult result) {
-                        Log.d(TAG, "onConnectionFailed: " + result);
-                    }
-                })
                 .addApi(Wearable.API)
                 .build();
-        PutDataMapRequest dataMap = PutDataMapRequest.create(POSITION_PATH);
-        dataMap.getDataMap().putInt(POSITION_KEY, 1234);
-        PutDataRequest request = dataMap.asPutDataRequest();
-        PendingResult<DataApi.DataItemResult> pendingResult = Wearable.DataApi
-                .putDataItem(mGoogleApiClient, request);
-        pendingResult;
-        Log.d(TAG, "send");
-        */
+        mGoogleApiClient.connect();
     }
     @Override
     public void onDataChanged(DataEventBuffer dataEvents) {
@@ -80,6 +67,14 @@ public class MyService extends WearableListenerService {
                     DataMap map = DataMapItem.fromDataItem(event.getDataItem()).getDataMap();
                     int distance = map.getInt(POSITION_KEY);
                     Log.d(TAG, "distance:" + distance);
+                    NotificationManager nm = (NotificationManager)getSystemService(Context.NOTIFICATION_SERVICE);
+                    Notification notification = new Notification.Builder(this)
+                            .setContentTitle("test")
+                            .setContentText("distance:" + distance)
+                            .setSmallIcon(R.drawable.ic_launcher)
+                            .build();
+                    notification.contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, MyActivity.class), PendingIntent.FLAG_UPDATE_CURRENT);
+                    nm.notify(0, notification);
                 }
             }
         }

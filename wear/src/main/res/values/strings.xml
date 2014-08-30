@@ -4,5 +4,10 @@
     <string name="app_name">catchme</string>
     <string name="hello_round">Hello Round World!a</string>
     <string name="hello_square">Hello Square World!a</string>
+    <string name="hello_round_my">Hello Round World! my</string>
+    <string name="hello_square_my">Hello Square World! my</string>
+    <string name="title_activity_my">MyActivity</string>
+    <string name="hello_world">Hello world!</string>
+    <string name="action_settings">Settings</string>
 
 </resources>
