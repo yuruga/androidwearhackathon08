@@ -6,7 +6,7 @@ android {
     buildToolsVersion "20.0.0"
 
     defaultConfig {
-        applicationId "awear.hackathon2014.jp.catchme"
+        applicationId "jp.yuruga.catchme"
         minSdkVersion 20
         targetSdkVersion 20
         versionCode 1

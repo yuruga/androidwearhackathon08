@@ -1,4 +1,4 @@
-package awear.hackathon2014.jp.catchme;
+package jp.yuruga.catchme;
 
 import android.app.Activity;
 import android.app.Notification;
@@ -66,6 +66,8 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
+import jp.yuruga.catchme.R;
+
 
 public class MainActivity extends FragmentActivity implements GoogleApiClient.ConnectionCallbacks, GoogleApiClient.OnConnectionFailedListener, MessageApi.MessageListener, NodeApi.NodeListener, DataApi.DataListener{
 
@@ -79,7 +81,7 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
     private static final int REQUEST_RESOLVE_ERROR = 1000;
 
     //action
-    //public static final String ACTION_OPEN_WEAR_APP = "awear.hackathon2014.jp.OPEN_WEAR_APP";
+    //public static final String ACTION_OPEN_WEAR_APP = "jp.yuruga.catchme.OPEN_WEAR_APP";
 
     //data api key and path
     private static final String START_ACTIVITY_PATH = "/start-activity";
@@ -200,8 +202,10 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
         mMap.setOnMapClickListener(new GoogleMap.OnMapClickListener() {
             @Override
             public void onMapClick(LatLng latLng) {
+                latitude = latLng.latitude;
+                longitude = latLng.longitude;
+                updateSelfData();
                 Toast.makeText(getApplicationContext(), "タップ位置\n緯度：" + latLng.latitude + "\n経度:" + latLng.longitude, Toast.LENGTH_LONG).show();
-
             }
         });
 
@@ -534,9 +538,6 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
                     _isfirst = true;
                     updateSelfData();
                 }
-//                if(!_users.containsKey(_macAddress)){
-//                    updateSelfData();
-//                }
             }
 
             @Override
@@ -558,17 +559,33 @@ public class MainActivity extends FragmentActivity implements GoogleApiClient.Co
 
     public Map<String, User> getUsers(){
         User self = _users.get(_macAddress);
-        User u;
+        User user;
         for (String key : _users.keySet()) {
             if(key == _macAddress){
-                u = _users.get(key);
-                u.setDistance(getDistance(self.getLatitude(), self.getLongitude(), u.getLatitude(), u.getLongitude()));
+                user = _users.get(key);
+                user.setDistance(getDistance(self.getLatitude(), self.getLongitude(), user.getLatitude(), user.getLongitude()));
             }else{
                 self.setDistance(0);
             }
         }
         return _users;
     }
+
+    public User getNearUser() {
+        Map<String, User> users = getUsers();
+        double min = -1;
+        double currentMin;
+        User user = null;
+        for (String key : users.keySet()) {
+            currentMin = users.get(key).getDistance();
+            if(min < 0 || users.get(key).getDistance() < min){
+                min = currentMin;
+                user = users.get(key);
+            }
+        }
+        return user;
+    }
+
 
     public double getDistance(double fLat, double fLon, double tLat, double tLon){
         double er = 6378.137f;

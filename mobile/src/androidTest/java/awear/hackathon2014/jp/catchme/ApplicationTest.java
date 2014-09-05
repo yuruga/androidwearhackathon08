@@ -1,4 +1,4 @@
-package awear.hackathon2014.jp.catchme;
+package jp.yuruga.catchme;
 
 import android.app.Application;
 import android.test.ApplicationTestCase;

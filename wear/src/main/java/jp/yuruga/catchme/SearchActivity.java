@@ -1,7 +1,6 @@
-package awear.hackathon2014.jp.catchme;
+package jp.yuruga.catchme;
 
 import android.app.Activity;
-import android.content.ComponentName;
 import android.os.Bundle;
 import android.support.wearable.view.WatchViewStub;
 import android.widget.TextView;
@@ -11,7 +10,6 @@ import android.hardware.Sensor;
 import android.hardware.SensorEventListener;
 import android.hardware.SensorEvent;
 import android.util.Log;
-import android.content.Intent;
 
 import com.google.android.gms.common.api.GoogleApiClient;
 import com.google.android.gms.common.api.PendingResult;
@@ -19,6 +17,8 @@ import com.google.android.gms.wearable.DataApi;
 import com.google.android.gms.wearable.PutDataMapRequest;
 import com.google.android.gms.wearable.PutDataRequest;
 import com.google.android.gms.wearable.Wearable;
+
+import jp.yuruga.catchme.R;
 
 public class SearchActivity extends Activity {
 

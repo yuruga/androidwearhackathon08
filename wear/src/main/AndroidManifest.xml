@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="awear.hackathon2014.jp.catchme" >
+    package="jp.yuruga.catchme" >
 
     <uses-feature android:name="android.hardware.type.watch" />
 
@@ -14,7 +14,7 @@
             android:value="@integer/google_play_services_version" />
 
         <activity
-            android:name=".SearchActivity"
+            android:name="jp.yuruga.catchme.SearchActivity"
             android:label="@string/app_name" >
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
@@ -24,7 +24,7 @@
         </activity>
 
         <service
-            android:name=".MyService"
+            android:name="jp.yuruga.catchme.MyService"
             android:enabled="true"
             android:exported="true" >
             <intent-filter>
@@ -33,7 +33,7 @@
         </service>
 
         <activity
-            android:name=".MyActivity"
+            android:name="jp.yuruga.catchme.MyActivity"
             android:label="@string/title_activity_my" >
         </activity>
     </application>
